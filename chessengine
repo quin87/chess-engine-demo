@@ -1,0 +1,52 @@
+from pychess_engine import Engine
+from stockfish import Stockfish
+import chess
+import math
+
+engine = Stockfish("""UPLOAD YOUR PATH TO THE STOCKFISH ENGINE TO UTILIZE ITS EVALUATION FUNCTION.""")
+#eg. Stockfish(path="/Users/xxx/xxx/stockfish/stockfish-windows-x86-64-avx2")
+
+
+board = chess.Board()
+
+def loadboard(fenstr):
+    engine.set_fen_position(fenstr)
+
+def evaluate(fenstr):
+    loadboard(fenstr)
+    return engine.get_evaluation()["value"]
+
+def minimax(board,depth, maximizingplayer,alpha,beta):
+    if depth==0 or not bool(board.legal_moves):
+        return evaluate(board.fen()),""
+    if maximizingplayer:
+        maxEval = -math.inf
+        for successor in list(board.legal_moves):
+            board.push(successor)
+            eval,path = minimax(board,depth-1,False,alpha,beta)
+            if maxEval<eval:
+                maxEval = eval
+                highestpath = successor
+            board.pop()
+            alpha = max(alpha,eval)
+            if maximizingplayer:
+                print("max_move:",highestpath,maxEval,"move:",eval,successor,alpha,beta,depth)
+            if beta <= alpha:
+                break
+        return maxEval,highestpath
+    else:
+        minEval = math.inf
+        for successor in list(board.legal_moves):
+            board.push(successor)
+            eval,path = minimax(board,depth-1,True,alpha,beta)
+            if minEval > eval:
+                minEval = eval
+                lowestpath = successor
+            board.pop()
+            if not maximizingplayer:
+                print("mini_move:",lowestpath,minEval,"Move:",eval,successor," Alpha & Beta: ",alpha,beta," Depth:",depth)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
+
+        return minEval,lowestpath
