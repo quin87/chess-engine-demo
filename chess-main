@@ -1,0 +1,170 @@
+import chess
+import chess.svg
+import sys
+import chessengine 
+from PyQt5.QtSvg import QSvgWidget
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QCheckBox, QWidget, QLabel,QPushButton, QMessageBox
+from PyQt5 import QtCore
+import math
+
+
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super(MainWindow,self).__init__()
+
+        self.RANK_NAMES = ['8', '7', '6', '5', '4', '3', '2', '1']
+        self.current_player=False
+
+        self.setGeometry(500, 200, 1050, 730)
+        self.selected_piece = None
+        self.piecetype = None
+
+        self.BOARD_SIZE = 720
+        self.CELL_SIZE = self.BOARD_SIZE // 8
+ 
+        self.initialize_board()
+        self.updateBoard()
+
+    def initialize_board(self):
+        """Sets board to the default state"""
+        """board initialization"""
+        self.widgetSvg = QSvgWidget(parent=self)
+        self.widgetSvg.setFixedHeight(10)
+        self.widgetSvg.setFixedWidth(10)
+        self.widgetSvg.setFixedSize(self.BOARD_SIZE, self.BOARD_SIZE)
+        self.chessboard = chess.Board()
+        """button initialization"""
+        self.b1 = QtWidgets.QPushButton(self)
+        self.b1.setText("Undo")
+        self.b1.clicked.connect(self.undo)
+        self.b1.setGeometry(720,10,170,80)
+        self.b2 = QtWidgets.QPushButton(self)
+        self.b2.setText("New Game")
+        self.b2.clicked.connect(self.newgame)
+        self.b2.setGeometry(890,10,170,80)
+        """textbox initialization"""
+        self.centipawn_label = QLabel("Centipawns:",self)
+        self.centipawn_label.setGeometry(740,100,150,30)
+        self.message_label = QLabel("",self)
+        self.message_label.setGeometry(740,200,150,30) 
+        #self.message_label.setAlignment(QtCore.Qt.AlignmentFlag(2))        
+        self.slider = QtWidgets.QSlider(self)
+        self.slider.setGeometry(QtCore.QRect(800, 500, 160, 16))
+        self.slider.setOrientation(QtCore.Qt.Horizontal)
+        self.slider.setRange(1,3)
+        self.depth_label = QLabel("Depth/Difficulty:",self)
+        self.depth_label.setGeometry(800, 480, 160, 16)
+    def undo(self):
+        """Removes the last move made"""
+        if self.chessboard.move_stack:
+            self.chessboard.pop()
+            self.updateBoard()
+    def newgame(self):
+        """Resets the board to the initial state"""
+        self.chessboard.reset()
+        self.updateBoard()
+
+    def updatecentipawns(self,text):
+        """Post the board evalutaion to the svg label"""
+        self.centipawn_label.setText(text+" Centipawns") 
+    
+    def update_message_label(self,text):
+        self.message_label.setText(text) 
+    
+    def updateBoard(self):
+        """Updates the SVG chess board"""
+        self.chessboardSvg = chess.svg.board(self.chessboard).encode("UTF-8")
+        self.widgetSvg.load(self.chessboardSvg) 
+
+    def move_piece(self, move):
+        "moves a piece: move is a chess.Move.from_uci(ucimove)"
+        self.chessboard.push(move)
+        self.updateBoard()
+    
+    def depth(value):
+        return value
+
+    def Promote(self):
+        """Promotes a pawn through a popup window"""
+        msg = QMessageBox()
+        msg.setWindowTitle("Choose a Promotion")
+        msg.setText("Which option do you choose?")
+        btn_Queen = msg.addButton("Queen", QMessageBox.AcceptRole)
+        btn_Knight = msg.addButton("Knight", QMessageBox.AcceptRole)
+        btn_Rook = msg.addButton("Rook", QMessageBox.AcceptRole)
+        btn_Bishop = msg.addButton("Bishop", QMessageBox.AcceptRole)
+
+        msg.exec_()
+        button_clicked = msg.clickedButton()
+
+        if button_clicked == btn_Queen:
+            return "q"
+        elif button_clicked == btn_Knight:
+            return "k"
+        elif button_clicked == btn_Rook:
+            return "r"
+        elif button_clicked == btn_Bishop:
+            return "b"
+
+    def mousePressEvent(self, event):
+        cell_size = self.CELL_SIZE
+        col = event.x() // cell_size
+        row = event.y() // cell_size 
+
+        if row <= 7 and col <= 7:
+            #if col*row<cell_size:
+            clicked_piece = chess.FILE_NAMES[col]+self.RANK_NAMES[row] 
+            print(row,col,clicked_piece,self.selected_piece)
+            if self.selected_piece:
+                
+                if self.selected_piece == clicked_piece:
+                    self.selected_piece = None 
+                    piecetype = None
+                    self.update_message_label("Same spot clicked")
+                else:
+                    # Try to move the selected piece
+                    ucimove = self.selected_piece+clicked_piece
+                    if self.piecetype == 1 and ucimove[1]=="7" and ucimove[3]=="8":
+                        ucimove = ucimove + self.Promote()
+                    if self.piecetype == 1 and ucimove[1]=="2" and ucimove[3]=="1":
+                        ucimove = ucimove + self.Promote()
+                    move = chess.Move.from_uci(ucimove)
+                    if self.chessboard.is_legal(move):
+                        
+                        self.move_piece(move)
+
+                        depth = self.slider.value()
+                        res = chessengine.minimax(self.chessboard,depth,False,-math.inf,math.inf)
+                        self.chessboard.push(res[1] )
+                        self.updatecentipawns(str(res[0]))
+                        
+                        #self.current_player = True if self.current_player == False else False
+                    self.selected_piece = None
+                    self.piecetype = None
+                    
+                    self.update_message_label("Arguements reset")
+                    
+                    
+
+            elif clicked_piece : 
+                #and clicked_piece_color == self.current_player:
+                self.selected_piece = clicked_piece
+                self.piecetype = self.chessboard.piece_type_at((7-row)*8+col)
+                #clicked_piece_color = self.piecetype.color if self.piecetype != None else "Null"
+            self.updateBoard()
+            
+            
+    
+
+def main():
+    app = QApplication(sys.argv)
+    game = MainWindow()
+    game.show()
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()    
+
+    
